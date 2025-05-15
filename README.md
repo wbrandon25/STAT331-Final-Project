@@ -2,3 +2,4 @@
 
 # Team members
 - Brandon Wong
+- Shuya Yanase
