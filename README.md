@@ -1,4 +1,4 @@
-# Stat331
+# Stat331 Final Project
 
 # Team members
 - Brandon Wong
