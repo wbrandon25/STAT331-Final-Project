@@ -6,6 +6,7 @@ format:
     embed-resources: true
     code-tools: true
     toc: true
+    code-fold: true 
 editor: source
 execute: 
   error: true
@@ -14,6 +15,20 @@ execute:
   warning: false
 bibliography: references.bib
 ---
+
+## Load Libraries
+```{r}
+# Load required libraries
+library(readr)
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(knitr)
+library(ggplot2)
+library(gganimate)
+library(gt)
+
+```
 ## Introduction
 
 In this project, we will investigate the relationship between life expectancy at birth and GDP per capita across various countries. Life expectancy at birth represents the average number of years a newborn is expected to live, based on current mortality rates. This data is sourced from the United Nations Population Division through Gapminder [@gapminder_lex]. GDP per capita measures the economic output per person, adjusted for purchasing power parity in constant 2021 international dollars, and is also obtained from Gapminder [@gapminder_gdp]. 
@@ -59,12 +74,6 @@ Below is the R code used to clean and prepare the data. Each chunk is commented 
 
 ```{r}
 # Load required libraries
-library(readr)
-library(tidyr)
-library(dplyr)
-library(stringr)
-library(knitr)
-
 # Read datasets, specifying all columns as character to handle mixed types
 gdp_per_capita <- read_csv("gdp_pcap.csv", col_types = cols(.default = "c"))
 life_expectancy <- read_csv("lex.csv", col_types = cols(.default = "c"))
@@ -108,3 +117,117 @@ cleaned_data <- cleaned_data |>
 # Save the cleaned dataset
 write_csv(cleaned_data, "cleaned_combined_data.csv")
 ```
+## Linear Regression
+
+In this section, we explore the relationship between GDP per capita and life expectancy. We first visualize the data through a scatterplot and an animated scatterplot, then fit a linear model, and finally assess how good the fit of the model was.
+
+### Data Visualization
+
+To get a first look at the overall trend, we collapse our cleaned dataset to one point per country by averaging across all years. We will be using a log scale for the GDP per capita because the data is skewed with some countries having super high GDPs while other countries having super low GDPs. This will make it easier to visualize the graph and observe a better pattern.  The figure below shows a scatter plot of average GDP per capita on a log scale vs. average life expectancy.
+
+
+```{r}
+agg_data <- cleaned_data |>
+  group_by(country) |>
+  summarize(
+    mean_gdp = mean(gdp_per_capita),
+    mean_lex = mean(life_expectancy)
+  )
+
+ggplot(agg_data, aes(x = mean_gdp, y = mean_lex)) +
+  geom_point(alpha = 0.7) +
+  scale_x_log10() +
+  labs(
+    x = "Average GDP per Capita (log 10 scale)",
+    y = "Average Life Expectancy (years)",
+    title = "Life Expectancy vs. GDP per Capita"
+  )
+
+```
+This figure shows us that there is a positive correlation between average life expectancy and average GDP per Capita in different countries. The higher the the average GDP per Capita in a country, the higher average life expectancy they have.
+Next, to see how this relationship evolves over time, we build an animated scatterplot where each frame is one year, showing how each country's position changes over time.
+
+```{r}
+anim_gif <- ggplot(cleaned_data, 
+                   aes(x = gdp_per_capita, y = life_expectancy, group = country)) +
+  geom_point(alpha = 0.6, size = 2) +
+  scale_x_log10() +
+  labs(
+    title    = 'Life Expectancy vs GDP per Capita over Time',
+    subtitle = 'Year: {frame_time}',
+    x        = 'GDP per Capita (log 10 scale)',
+    y        = 'Life Expectancy (years)'
+  ) +
+  theme_minimal(base_size = 14) +
+  transition_time(year) +
+  ease_aes('linear')
+
+animate(anim_gif, nframes = 100, fps = 10, renderer = gifski_renderer())
+
+```
+The animation reveals us to that a lot of countries started off clustering in the bottom left corner meaning they all had lower life expectancy and lower GDP per Capita in the earlier years and over the decades, they all started to move towards higher life expectancy and higher GDP per Capita. They also started to move out of a cluster as time went on showing that the gaps between the countries grew as time went on.
+
+### Linear Model
+
+To quantify this relationship, we will be fitting a linear regression model between life expectancy (y-value) and GDP in log 10 base (x-value). We once again, take the average between all the years for each country to get a single x and y value for each country. 
+```{r}
+reg_data <- agg_data |>
+  mutate(log_gdp = log10(mean_gdp))
+
+model <- lm(mean_lex ~ log_gdp, data = reg_data)
+
+coef_df <- data.frame(
+  Term        = rownames(summary(model)$coefficients),
+  Estimate    = summary(model)$coefficients[,1],
+  `Std. Error`= summary(model)$coefficients[,2],
+  `Pr(>|t|)`  = summary(model)$coefficients[,4],
+  check.names = FALSE,
+  row.names   = NULL,
+  stringsAsFactors = FALSE
+)
+
+kable(
+  coef_df,
+  digits = 3,
+  caption = "Regression Coefficients for Life Expectancy Model"
+)
+
+```
+The slope of the linear regression line is around 12.9. Because we used a log 10 scale, this means that every 10 times increase in the GDP per Capita, the life expectancy grows about 12.9 years. The intercept of 2.85 years doesn't really mean much in this context since it represents the life expectancy when the GDP per capita is 1 dollar which isn't reasonable.
+
+### Model Fit
+To access how well the model fits the data, we will be taking a look at how much variability was accounted by the regression. 
+A respresents the variance of the observed life expectancies, B representes the variance of the values predicted by the model, and C represents the variance of the residuals. R^2 is then calculate as B over A.
+
+```{r}
+
+A <- var(reg_data$mean_lex)
+B <- var(fitted(model))
+C <- var(residuals(model))
+R2 <- B / A
+
+fit_table <- data.frame(
+  Component = c(
+    "Response variance (A)",
+    "Fitted variance (B)",
+    "Residual variance (C)",
+    "R-squared (B / A)"
+  ),
+  Value = c(A, B, C, R2),
+  stringsAsFactors = FALSE
+)
+
+fit_table |>
+  gt() |>
+  tab_header(
+    title = "Model Fit Metrics"
+  ) |>
+  fmt_number(
+    columns = "Value",
+    decimals = 4
+  )
+
+```
+
+The table shows that the total variability in average life expectancy across countries is about 51.99. Of that, 30.17 is captured by our straight‐line model linking GDP per capita to life expectancy, leaving 21.82 as the residual variance. Dividing fitted variance by total variance gives an R-squared of 0.5803, meaning that about 58% of the differences in life expectancy can be explained by GDP per person. This means that this model is a moderately strong fit for this situation.
+
