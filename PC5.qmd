@@ -186,6 +186,12 @@ coef_df <- data.frame(
   stringsAsFactors = FALSE
 )
 
+coef_df$Term[coef_df$Term == "(Intercept)"] <- "Intercept"
+coef_df$Term[coef_df$Term == "log_gdp"] <- "Log GDP"
+
+coef_df[, 2:4] <- round(coef_df[, 2:4], 2)
+
+
 kable(
   coef_df,
   digits = 3,
@@ -224,7 +230,7 @@ fit_table |>
   ) |>
   fmt_number(
     columns = "Value",
-    decimals = 4
+    decimals = 2
   )
 
 ```
