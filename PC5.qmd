@@ -1,0 +1,294 @@
+---
+title: "Final Report"
+author: "HanYu Wu, Evan Cao, Brandon Wong, Shuya Yanase"
+format: 
+  html:
+    embed-resources: true
+    code-tools: true
+    toc: true
+    code-fold: true 
+editor: source
+execute: 
+  error: true
+  echo: true
+  message: false
+  warning: false
+bibliography: references.bib
+---
+
+## Load Libraries
+```{r}
+# Load required libraries
+library(readr)
+library(tidyr)
+library(dplyr)
+library(stringr)
+library(knitr)
+library(ggplot2)
+library(gganimate)
+library(gt)
+library(purrr)
+```
+## Introduction
+
+In this project, we will investigate the relationship between life expectancy at birth and GDP per capita across various countries. Life expectancy at birth represents the average number of years a newborn is expected to live, based on current mortality rates. This data is sourced from the United Nations Population Division through Gapminder [@gapminder_lex]. GDP per capita measures the economic output per person, adjusted for purchasing power parity in constant 2021 international dollars, and is also obtained from Gapminder [@gapminder_gdp]. 
+
+The life expectancy dataset includes data for 196 countries spanning the years 1800 to 2100, while the GDP per capita dataset covers a similar range for 195 countries. We will be joining and merging the two dataset to explore the relationship between an country's life expectancy and their GDP per capita. The observations in the new dataset will correspond to a unique country-year pair, containing values for both variables alongside the country and year identifier.
+
+## Hypothesis
+
+We hypothesize a positive correlation between GDP per capita and life expectancy, meaning that higher economic output per person is generally associated with longer life spans. We expect this relationship to be moderately strong, as countries with greater wealth typically have resources to invest in healthcare, nutrition, and infrastructure, all of which contribute to improved health outcomes.
+
+This expectation aligns with findings from @miladinov2020, who studied five EU accession candidate countries (Macedonia, Serbia, Bosnia and Herzegovina, Montenegro, and Albania) from 1990 to 2017. Using a Full Information Maximum Likelihood model, they found that higher GDP per capita and lower infant mortality rates significantly increase life expectancy at birth, suggesting that socioeconomic development is a prerequisite for longer life. While we anticipate a general trend where increases in GDP per capita correspond to higher life expectancy, exceptions may exist, such as countries with high GDP per capita but stable life expectancy due to already low mortality rates or other limiting factors.
+
+## Data Cleaning
+
+To prepare the data for analysis, we undertook several cleaning steps to ensure consistency and reliability. Below, we outline the process, address specific issues such as countries with empty columns or missing data, and discuss the decisions made along with their potential impacts on the analysis.
+
+1. **Reshaping the Data**  
+   Both datasets were originally in wide format, with countries as rows and years as columns. The life expectancy dataset includes 196 countries and 301 years (1800–2100), while the GDP per capita dataset covers 195 countries over the same period. We transformed each into long format, where each row represents a country-year pair with its respective value (life expectancy or GDP per capita). This restructuring facilitates merging and analysis across time.
+
+2. **Handling Non-Numeric Values in GDP Data**  
+   The GDP per capita dataset contained some values with a "k" suffix (e.g., "10k" for 10,000), indicating thousands. To standardize these, we read all columns as characters, removed the "k" suffix where present, multiplied those values by 1000, and converted the resulting column to numeric format. This ensures all economic output values are consistently represented as numbers.
+
+3. **Joining the Datasets**  
+   We performed an inner join on the "country" and "year" columns, retaining only country-year pairs present in both datasets. This includes years from 1800 to 2100 where data is available for both life expectancy and GDP per capita. Countries with data in one dataset but not the other (e.g., a country with GDP per capita data but no life expectancy data for the same years) are excluded from the combined dataset. Similarly, countries with completely empty columns in the original wide format, meaning no data for any year in one of the variables will have no corresponding rows after reshaping and joining, effectively excluding them from the analysis.
+
+4. **Removing Missing Data**  
+   After joining, we excluded rows with missing values in either life expectancy or GDP per capita. This ensures a complete dataset for analysis but reduces the sample size by omitting partial records, such as years where one variable is unavailable even if the other is present.
+
+5. **Filtering Life Expectancy**  
+   We will then appliy a filter to retain life expectancy values between 0 and 120 years, reflecting a realistic biological range. No current values exceeded this threshold, but this safeguard protects against potential future anomalies.
+
+### Implications of Cleaning Decisions
+- **Inner Join**: By retaining only country-year pairs with data in both datasets, we ensure completeness but exclude countries with data in only one dataset (e.g., GDP per capita but no life expectancy). This also handles countries with empty columns, as they will not contribute any rows to the combined dataset.
+- **Missing Value Removal**: Enhances reliability by avoiding incomplete observations but may exclude additional country-year pairs, potentially biasing the sample toward countries with more consistent data reporting across both variables.
+- **GDP Conversion**: Standardizing "k" values enables accurate statistical analysis, critical for exploring economic-health relationships.
+- **Life Expectancy Filter**: Maintains data integrity by excluding implausible values, though it is currently not triggered.
+
+The cleaned dataset was saved as `cleaned_combined_data.csv` for subsequent analysis. These steps prioritize data quality over inclusivity, potentially limiting the number of countries and years included—particularly for countries with sparse or non-overlapping data—a trade-off we will consider when interpreting results.
+
+### R Code for Data Cleaning
+
+Below is the R code used to clean and prepare the data. Each chunk is commented for clarity.
+
+```{r}
+# Load required libraries
+# Read datasets, specifying all columns as character to handle mixed types
+gdp_per_capita <- read_csv("gdp_pcap.csv", col_types = cols(.default = "c"))
+life_expectancy <- read_csv("lex.csv", col_types = cols(.default = "c"))
+
+# Reshape GDP per capita data to long format
+gdp_per_capita_long <- gdp_per_capita |>
+  pivot_longer(cols = -country, 
+               names_to = "year", 
+               values_to = "gdp_per_capita", 
+               names_transform = list(year = as.integer))
+
+# Reshape life expectancy data to long format
+life_expectancy_long <- life_expectancy |>
+  pivot_longer(cols = -country, 
+               names_to = "year", 
+               values_to = "life_expectancy", 
+               names_transform = list(year = as.integer))
+
+# Convert GDP per capita, handling "k" suffix
+gdp_per_capita_long <- gdp_per_capita_long |>
+  mutate(gdp_per_capita = ifelse(str_ends(gdp_per_capita, "k"),
+                                 as.numeric(str_remove(gdp_per_capita, "k")) * 1000,
+                                 as.numeric(gdp_per_capita)))
+
+# Convert life expectancy to numeric
+life_expectancy_long <- life_expectancy_long |>
+  mutate(life_expectancy = as.numeric(life_expectancy))
+
+# Join datasets using an inner join
+combined_data <- inner_join(life_expectancy_long, gdp_per_capita_long, 
+                            by = c("country", "year"))
+
+# Remove rows with missing values
+cleaned_data <- combined_data |>
+  filter(!is.na(life_expectancy) & !is.na(gdp_per_capita))
+
+# Filter life expectancy to realistic range (0–120 years)
+cleaned_data <- cleaned_data |>
+  filter(life_expectancy >= 0 & life_expectancy <= 120)
+
+# Save the cleaned dataset
+write_csv(cleaned_data, "cleaned_combined_data.csv")
+```
+## Linear Regression
+
+In this section, we explore the relationship between GDP per capita and life expectancy. We first visualize the data through a scatterplot and an animated scatterplot, then fit a linear model, and finally assess how good the fit of the model was.
+
+### Data Visualization
+
+To get a first look at the overall trend, we collapse our cleaned dataset to one point per country by averaging across all years. We will be using a log scale for the GDP per capita because the data is skewed with some countries having super high GDPs while other countries having super low GDPs. This will make it easier to visualize the graph and observe a better pattern.  The figure below shows a scatter plot of average GDP per capita on a log scale vs. average life expectancy.
+
+
+```{r}
+agg_data <- cleaned_data |>
+  group_by(country) |>
+  summarize(
+    mean_gdp = mean(gdp_per_capita),
+    mean_lex = mean(life_expectancy)
+  )
+
+ggplot(agg_data, aes(x = mean_gdp, y = mean_lex)) +
+  geom_point(alpha = 0.7) +
+  scale_x_log10() +
+  labs(
+    x = "Average GDP per Capita (log 10 scale)",
+    y = "Average Life Expectancy (years)",
+    title = "Life Expectancy vs. GDP per Capita"
+  )
+
+```
+This figure shows us that there is a positive correlation between average life expectancy and average GDP per Capita in different countries. The higher the the average GDP per Capita in a country, the higher average life expectancy they have.
+Next, to see how this relationship evolves over time, we build an animated scatterplot where each frame is one year, showing how each country's position changes over time.
+
+```{r}
+anim_gif <- ggplot(cleaned_data, 
+                   aes(x = gdp_per_capita, y = life_expectancy, group = country)) +
+  geom_point(alpha = 0.6, size = 2) +
+  scale_x_log10() +
+  labs(
+    title    = 'Life Expectancy vs GDP per Capita over Time',
+    subtitle = 'Year: {frame_time}',
+    x        = 'GDP per Capita (log 10 scale)',
+    y        = 'Life Expectancy (years)'
+  ) +
+  theme_minimal(base_size = 14) +
+  transition_time(year) +
+  ease_aes('linear')
+
+animate(anim_gif, nframes = 100, fps = 10, renderer = gifski_renderer())
+
+```
+The animation reveals us to that a lot of countries started off clustering in the bottom left corner meaning they all had lower life expectancy and lower GDP per Capita in the earlier years and over the decades, they all started to move towards higher life expectancy and higher GDP per Capita. They also started to move out of a cluster as time went on showing that the gaps between the countries grew as time went on.
+
+### Linear Model
+
+To quantify this relationship, we will be fitting a linear regression model between life expectancy (y-value) and GDP in log 10 base (x-value). We once again, take the average between all the years for each country to get a single x and y value for each country. 
+```{r}
+reg_data <- agg_data |>
+  mutate(log_gdp = log10(mean_gdp))
+
+model <- lm(mean_lex ~ log_gdp, data = reg_data)
+
+coef_df <- data.frame(
+  Term        = rownames(summary(model)$coefficients),
+  Estimate    = summary(model)$coefficients[,1],
+  `Std. Error`= summary(model)$coefficients[,2],
+  `Pr(>|t|)`  = summary(model)$coefficients[,4],
+  check.names = FALSE,
+  row.names   = NULL,
+  stringsAsFactors = FALSE
+)
+
+kable(
+  coef_df,
+  digits = 3,
+  caption = "Regression Coefficients for Life Expectancy Model"
+)
+
+```
+The slope of the linear regression line is around 12.9. Because we used a log 10 scale, this means that every 10 times increase in the GDP per Capita, the life expectancy grows about 12.9 years. The intercept of 2.85 years doesn't really mean much in this context since it represents the life expectancy when the GDP per capita is 1 dollar which isn't reasonable.
+
+### Model Fit
+To access how well the model fits the data, we will be taking a look at how much variability was accounted by the regression. 
+A respresents the variance of the observed life expectancies, B representes the variance of the values predicted by the model, and C represents the variance of the residuals. R^2 is then calculate as B over A.
+
+```{r}
+
+A <- var(reg_data$mean_lex)
+B <- var(fitted(model))
+C <- var(residuals(model))
+R2 <- B / A
+
+fit_table <- data.frame(
+  Component = c(
+    "Response variance (A)",
+    "Fitted variance (B)",
+    "Residual variance (C)",
+    "R-squared (B / A)"
+  ),
+  Value = c(A, B, C, R2),
+  stringsAsFactors = FALSE
+)
+
+fit_table |>
+  gt() |>
+  tab_header(
+    title = "Model Fit Metrics"
+  ) |>
+  fmt_number(
+    columns = "Value",
+    decimals = 4
+  )
+
+```
+
+The table shows that the total variability in average life expectancy across countries is about 51.99. Of that, 30.17 is captured by our straight‐line model linking GDP per capita to life expectancy, leaving 21.82 as the residual variance. Dividing fitted variance by total variance gives an R-squared of 0.5803, meaning that about 58% of the differences in life expectancy can be explained by GDP per person. This means that this model is a moderately strong fit for this situation.
+
+
+## Cross Validation
+
+To check how well our log₁₀(GDP) → life expectancy model generalizes, we perform k-fold cross validation. We choose \(k = \lfloor N/10 \rfloor\) so that each fold has at least 10 countries. For each fold, we fit the model on the remaining \(k-1\) folds, predict on the held-out fold, and compute an out-of-sample R². Below is the implementation.
+
+### Implement k-fold cross validation
+
+```{r}
+reg_data <- agg_data %>%
+  mutate(log_gdp = log10(mean_gdp))
+
+set.seed(2025)                   
+N <- nrow(reg_data)         
+k <- floor(N / 10)             
+
+fold_ids <- sample(rep(1:k, length.out = N))
+reg_data <- reg_data %>% mutate(fold = fold_ids)
+
+compute_holdout_r2 <- function(j) {
+  train <- reg_data %>% filter(fold != j)
+  test <- reg_data %>% filter(fold == j)
+  
+  fit <- lm(mean_lex ~ log_gdp, data = train)
+  preds <- predict(fit, newdata = test)
+  
+  var(preds) / var(test$mean_lex)
+}
+
+cv_r2_values <- map_dbl(1:k, compute_holdout_r2)
+cv_results <- tibble(fold = 1:k, R2 = cv_r2_values)
+
+```
+
+
+### Plot the Results
+
+
+```{r}
+ggplot(cv_results, aes(x = factor(1), y = R2)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.1, alpha = 0.6, size = 2) +
+  geom_hline(
+    yintercept = mean(cv_results$R2),
+    linetype = "dashed",
+    color = "red"
+  ) +
+  labs(
+    x = "",
+    y = "Holdout R²",
+    title = paste0(k, "-Fold Cross-Validated R²"),
+    subtitle = paste0(
+      "Mean holdout R² = ",
+      round(mean(cv_results$R2), 3),
+      "; In‐sample R² = 0.5803"
+    )
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+
+The red dashed line at **0.847** in the plot marks the average of the 19 holdout-$R^2$ values (compared to the in-sample $R^2$ of **0.5803**). A mean holdout $R^2$ of 0.847 indicates that our simple model—predicting average life expectancy from $\log_{10}(\text{GDP per capita})$—explains about 85 % of the variance in previously unseen country subsets. In other words, even when predicting on held-out countries, the model retains strong predictive power, far exceeding the 58 % explained in-sample. Although there is some variability across folds—most holdout $R^2$ values cluster between roughly 0.5 and 1.0, with a few as low as \~0.3–0.4 and a few above 1.0—every fold still yields a positive $R^2$. This moderate spread means certain small subsets are slightly harder or easier to predict, but there is no scenario where the model’s performance collapses. Because the average out-of-sample $R^2$ (0.847) is substantially higher than the in-sample $R^2$ (0.5803), there is no evidence of overfitting; rather, the relationship between GDP and life expectancy generalizes exceptionally well across different groups of countries.
