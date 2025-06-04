@@ -46,27 +46,26 @@ This expectation aligns with findings from @miladinov2020, who studied five EU a
 To prepare the data for analysis, we undertook several cleaning steps to ensure consistency and reliability. Below, we outline the process, address specific issues such as countries with empty columns or missing data, and discuss the decisions made along with their potential impacts on the analysis.
 
 1. **Reshaping the Data**  
-   Both datasets were originally in wide format, with countries as rows and years as columns. The life expectancy dataset includes 196 countries and 301 years (1800–2100), while the GDP per capita dataset covers 195 countries over the same period. We transformed each into long format, where each row represents a country-year pair with its respective value (life expectancy or GDP per capita). This restructuring facilitates merging and analysis across time.
+   Both datasets were originally structured with countries as rows and years as columns. The life expectancy dataset includes 196 countries and spans from 1800 to 2100, while the GDP per capita dataset covers 195 countries over the same period. We transformed each dataset so that each row represents a country-year pair with its respective value. This restructuring facilitates combining datasets and conducting analysis across time.
 
 2. **Handling Non-Numeric Values in GDP Data**  
-   The GDP per capita dataset contained some values with a "k" suffix (e.g., "10k" for 10,000), indicating thousands. To standardize these, we read all columns as characters, removed the "k" suffix where present, multiplied those values by 1000, and converted the resulting column to numeric format. This ensures all economic output values are consistently represented as numbers.
+   The GDP per capita dataset contained some values with a "k" suffix (e.g., "10k" for 10,000), indicating thousands. To standardize these, we identified these abbreviated values, removed the "k" suffix where present, multiplied those values by 1000, and converted the resulting column to numeric format. This ensures all economic output values are consistently represented as numbers.
 
-3. **Joining the Datasets**  
-   We performed an inner join on the "country" and "year" columns, retaining only country-year pairs present in both datasets. This includes years from 1800 to 2100 where data is available for both life expectancy and GDP per capita. Countries with data in one dataset but not the other (e.g., a country with GDP per capita data but no life expectancy data for the same years) are excluded from the combined dataset. Similarly, countries with completely empty columns in the original wide format, meaning no data for any year in one of the variables will have no corresponding rows after reshaping and joining, effectively excluding them from the analysis.
+3. **Combining the Datasets**  
+   We merged the datasets by matching country and year, retaining only country-year pairs present in both datasets. This approach ensures we have complete information for analysis but excludes countries with data available in only one dataset. Countries with no data for either variable across all years are naturally excluded from the final dataset.
 
 4. **Removing Missing Data**  
-   After joining, we excluded rows with missing values in either life expectancy or GDP per capita. This ensures a complete dataset for analysis but reduces the sample size by omitting partial records, such as years where one variable is unavailable even if the other is present.
+   After combining, we excluded observations with missing values in either life expectancy or GDP per capita. This ensures a complete dataset for analysis but reduces the sample size by omitting partial records where one variable might be available but the other is not.
 
 5. **Filtering Life Expectancy**  
-   We will then appliy a filter to retain life expectancy values between 0 and 120 years, reflecting a realistic biological range. No current values exceeded this threshold, but this safeguard protects against potential future anomalies.
+  We retained only life expectancy values between 0 and 120 years, reflecting a realistic biological range. This safeguard protects against potential data entry errors or unrealistic projections.
+  
+6. **Focusing on Historical Datar** 
+  We limited our analysis to years through 2024, excluding projected future values. This decision ensures we analyze actual historical relationships rather than speculative projections, providing a more reliable foundation for understanding the GDP-life expectancy relationship.
 
 ### Implications of Cleaning Decisions
-- **Inner Join**: By retaining only country-year pairs with data in both datasets, we ensure completeness but exclude countries with data in only one dataset (e.g., GDP per capita but no life expectancy). This also handles countries with empty columns, as they will not contribute any rows to the combined dataset.
-- **Missing Value Removal**: Enhances reliability by avoiding incomplete observations but may exclude additional country-year pairs, potentially biasing the sample toward countries with more consistent data reporting across both variables.
-- **GDP Conversion**: Standardizing "k" values enables accurate statistical analysis, critical for exploring economic-health relationships.
-- **Life Expectancy Filter**: Maintains data integrity by excluding implausible values, though it is currently not triggered.
-
-The cleaned dataset was saved as `cleaned_combined_data.csv` for subsequent analysis. These steps prioritize data quality over inclusivity, potentially limiting the number of countries and years included—particularly for countries with sparse or non-overlapping data—a trade-off we will consider when interpreting results.
+Our data cleaning approach prioritizes completeness and accuracy over maximum sample size. By retaining only country-year pairs with data in both datasets, we ensure robust analysis but may exclude countries with sparse or non-overlapping data reporting. The removal of missing values enhances reliability but potentially introduces bias toward countries with more consistent data collection practices. Standardizing the economic data enables accurate statistical analysis, which is critical for exploring relationships between economic and health outcomes. The focus on historical data rather than projections provides a solid empirical foundation, though it limits our ability to examine very recent trends or make future predictions.
+These cleaning steps create a dataset that prioritizes data quality over inclusivity, a trade-off we will consider when interpreting our results and discussing the generalizability of our findings.
 
 ### R Code for Data Cleaning
 
@@ -112,7 +111,7 @@ cleaned_data <- combined_data |>
 
 # Filter life expectancy to realistic range (0–120 years)
 cleaned_data <- cleaned_data |>
-  filter(life_expectancy >= 0 & life_expectancy <= 120)
+  filter(life_expectancy >= 0 & life_expectancy <= 120 & year <= 2024)
 
 # Save the cleaned dataset
 write_csv(cleaned_data, "cleaned_combined_data.csv")
