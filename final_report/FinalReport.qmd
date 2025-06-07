@@ -60,8 +60,8 @@ These processing steps prioritize the quailty of the data over a larger example 
 ```{r, echo=FALSE}
 # Load required libraries
 # Read datasets, specifying all columns as character to handle mixed types
-gdp_per_capita <- read_csv("gdp_pcap.csv", col_types = cols(.default = "c"))
-life_expectancy <- read_csv("lex.csv", col_types = cols(.default = "c"))
+gdp_per_capita <- read_csv("data/gdp_pcap.csv", col_types = cols(.default = "c"))
+life_expectancy <- read_csv("data/lex.csv", col_types = cols(.default = "c"))
 
 # Reshape GDP per capita data to long format
 gdp_per_capita_long <- gdp_per_capita |>
@@ -100,7 +100,7 @@ cleaned_data <- cleaned_data |>
   filter(life_expectancy >= 0 & life_expectancy <= 120 & year <= 2024)
 
 # Save the cleaned dataset
-write_csv(cleaned_data, "cleaned_combined_data.csv")
+write_csv(cleaned_data, "data/cleaned_combined_data.csv")
 ```
 
 ```{r, echo=FALSE }
