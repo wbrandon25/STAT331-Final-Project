@@ -100,7 +100,7 @@ cleaned_data <- cleaned_data |>
   filter(life_expectancy >= 0 & life_expectancy <= 120 & year <= 2024)
 
 # Save the cleaned dataset
-write_csv(cleaned_data, "data/cleaned_combined_data.csv")
+write_csv(cleaned_data, "../data/cleaned_combined_data.csv")
 ```
 
 ```{r, echo=FALSE }
