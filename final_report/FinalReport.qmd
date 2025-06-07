@@ -250,5 +250,6 @@ Based on the data and real world dynamics, some limitations include
 ### Conclusion 
 Throughout the last 200 years, people in richer countries have longer life. A 10x increase in GDP is links to an increased life expectancy of 14 years. While the economics of a country is not the only factor that affect life expectancy, it seems like an accurate measure of a country's overall prosperity and plays an important role in how long their citizens live. Further research into this topic could explore adding more variables, such as how much is spent of education or healthcare, if the relationship between GDP and life expectancy differs in specific regions of the world, or if there is a more complex pattern. 
 
-### Project Github
-- https://github.com/wbrandon25/STAT331-Final-Project/
+### Project GitHub
+
+[STAT331-Final-Project GitHub Repository](https://github.com/wbrandon25/STAT331-Final-Project/)
